@@ -1,0 +1,63 @@
+{
+  "_comment": "Per-fold best-epoch composite scores from real training logs (2026-04-28 retrain). Composite = sum_{Poisson} (xgb_mae - pred_mae)/xgb_mae + sum_{binary} (pred_auc - xgb_auc). Positive = strict improvement over XGBoost across all 8 heads.",
+  "_source": "ml/research/models/v3.3.1-allfolds/logs/fold{0..4}_train.log BEST lines",
+  "_dataset": "Maryland traffic violations 2011-12-31 to 2026-04-21 (1,237,344 stops)",
+  "_cv_protocol": "walk-forward 5-fold with 90-day embargo",
+  "models": {
+    "xgboost_baseline": {
+      "fold_0": 0,
+      "fold_1": 0,
+      "fold_2": 0,
+      "fold_3": 0,
+      "fold_4": 0,
+      "mean": 0,
+      "_note": "XGBoost composite is normalized to 0 by definition (it is the baseline)."
+    },
+    "v3.2.0_plr": {
+      "fold_0": 0.292,
+      "fold_1": 0.657,
+      "fold_2": null,
+      "fold_3": 1.007,
+      "fold_4": 1.143,
+      "mean_4_folds": 0.775,
+      "_note": "Fold 2 skipped at v3.2.0 retrain time due to incorrect 'degenerate' assumption. Source: docs/v330-team-explainer.html."
+    },
+    "v3.3.1_plr_disposition": {
+      "fold_0": 0.741,
+      "fold_1": 0.859,
+      "fold_2": 0.902,
+      "fold_3": 0.996,
+      "fold_4": 1.065,
+      "mean_5_folds": 0.913,
+      "_note": "Full 5-fold retrain after the citation_rate target-encoding leak fix. Fold 2 reincluded after the 'degenerate' assumption was disproved (26K test rows actually present)."
+    }
+  },
+  "per_head_means_v3_3_1": {
+    "occ_mae": {"fold_0": 0.388, "fold_1": 0.365, "fold_2": 0.348, "fold_3": 0.335, "fold_4": 0.324},
+    "speed_occ_mae": {"fold_0": 0.034, "fold_1": 0.030, "fold_2": 0.029, "fold_3": 0.028, "fold_4": 0.028},
+    "trap_mae": {"fold_0": 0.055, "fold_1": 0.050, "fold_2": 0.049, "fold_3": 0.048, "fold_4": 0.047},
+    "speed_auc": {"fold_0": 0.864, "fold_1": 0.860, "fold_2": 0.881, "fold_3": 0.874, "fold_4": 0.858},
+    "search_auc": {"fold_0": 0.814, "fold_1": 0.834, "fold_2": 0.817, "fold_3": 0.867, "fold_4": 0.888},
+    "accident_auc": {"fold_0": 0.716, "fold_1": 0.814, "fold_2": 0.785, "fold_3": 0.791, "fold_4": 0.810},
+    "injury_auc": {"fold_0": 0.747, "fold_1": 0.764, "fold_2": 0.731, "fold_3": 0.765, "fold_4": 0.759},
+    "disposition_auc": {"fold_0": 0.892, "fold_1": 0.718, "fold_2": 0.737, "fold_3": 0.689, "fold_4": 0.690}
+  },
+  "_headline_comparison_note": "XGBoost baselines are the v3.3.0 composite-metric reference set from docs/v330-architecture-detail.html line ~1191. The +0.913 composite gain decomposes as +1.064 from Poisson heads minus 0.158 from binary heads — heterogeneous result, not uniformly winning.",
+  "headline_comparison": {
+    "occurrence_mae":   {"xgb": 0.339, "ft_t_5fold_mean": 0.352, "improvement_pct": -3.8,  "note": "slight regression"},
+    "speed_occ_mae":    {"xgb": 0.086, "ft_t_5fold_mean": 0.030, "improvement_pct": 65.1,  "note": "FT-T much better"},
+    "trap_mae":         {"xgb": 0.091, "ft_t_5fold_mean": 0.050, "improvement_pct": 45.1,  "note": "FT-T much better"},
+    "speed_auc":        {"xgb": 0.842, "ft_t_5fold_mean": 0.867, "delta": 0.025,  "note": "FT-T win"},
+    "search_auc":       {"xgb": 0.883, "ft_t_5fold_mean": 0.844, "delta": -0.039, "note": "FT-T worse — XGB Optuna stronger on rare-event binary"},
+    "accident_auc":     {"xgb": 0.894, "ft_t_5fold_mean": 0.783, "delta": -0.111, "note": "FT-T worse — XGB Optuna stronger on rare-event binary"},
+    "injury_auc":       {"xgb": 0.881, "ft_t_5fold_mean": 0.753, "delta": -0.128, "note": "FT-T worse — XGB Optuna stronger on rare-event binary"},
+    "disposition_auc":  {"xgb": 0.650, "ft_t_5fold_mean": 0.745, "delta": 0.095,  "note": "head new in v3.3.0; XGB value is estimate"}
+  },
+  "ablation_smoke_results_vs_plr_baseline": {
+    "spatial_gat":      {"composite_delta": -0.156, "ship": false, "branch": "next-gen/p2-spatial-cache"},
+    "moe_heads":        {"composite_delta": -0.226, "ship": false, "branch": "next-gen/p4-moe-heads"},
+    "lstm_late_fusion": {"composite_delta": -0.067, "ship": false, "branch": "next-gen/p4-moe-heads"},
+    "hawkes_self_excitation": {"composite_delta": -0.030, "ship": false, "branch": "next-gen/p5-hawkes"},
+    "plr_tokenizer":    {"composite_delta": +0.310, "ship": true, "shipped_in": "v3.2.0"}
+  }
+}

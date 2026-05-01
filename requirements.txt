@@ -1,0 +1,33 @@
+# Pinned dependencies for the analytics-project academic repo.
+# Tested against Python 3.12 on Windows + Linux.
+
+# Deep learning
+torch>=2.4.0,<2.11.0           # CUDA optional but recommended
+numpy>=1.26.0,<2.0.0
+pandas>=2.1.0,<3.0.0
+
+# Tabular feature engineering
+scikit-learn>=1.4.0,<2.0.0
+xgboost>=2.0.0,<3.0.0           # baseline comparator (src/baselines/, optional)
+
+# Spatial — H3 hexagonal grid
+h3>=4.1.0,<5.0.0
+
+# Parquet IO
+pyarrow>=16.0.0
+
+# Optional — training visualization
+tqdm>=4.65.0
+matplotlib>=3.8.0               # for results plotting
+
+# Optional — config / typing
+typing-extensions>=4.9.0
+
+# Notes:
+# - PostGIS / database dependencies (psycopg2, prisma) are NOT included.
+#   The academic version reads parquet files directly; DB upload paths
+#   from the parent monorepo are stripped from src/evaluation/inference.py.
+#
+# - To run the included `src/evaluation/inference.py`:
+#     pip install torch numpy pandas pyarrow h3 scikit-learn
+#   The five-fold ensemble runs CPU-only or CUDA (auto-detected).

@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evasion v3.3.0 — Detailed Architecture Reference</title>
+<style>
+  :root {
+    --bg:        #0A1929;
+    --bg-2:     #0F2138;
+    --card:      #142B47;
+    --card-hi:   #1B3A5E;
+    --border:    #1F4574;
+    --accent:    #4A8BFF;
+    --highlight: #5EE2FF;
+    --green:     #4CC27A;
+    --red:       #E35C5C;
+    --orange:    #FF9E4D;
+    --purple:    #B882FF;
+    --white:     #FFFFFF;
+    --light:     #C8CFDD;
+    --dim:       #7A889E;
+    --bg-green:  #10331E;
+    --bg-red:    #331010;
+    --bg-orange: #2E1F0A;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, Helvetica, sans-serif;
+    background: var(--bg);
+    color: var(--light);
+    line-height: 1.55;
+    font-size: 14px;
+  }
+
+  /* Layout: sidebar + content */
+  .layout {
+    display: grid;
+    grid-template-columns: 250px 1fr;
+    min-height: 100vh;
+  }
+
+  nav.toc {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    background: var(--bg-2);
+    border-right: 1px solid var(--border);
+    padding: 28px 20px;
+    overflow-y: auto;
+  }
+  nav.toc h1 {
+    font-size: 20px;
+    color: var(--white);
+    margin-bottom: 4px;
+    letter-spacing: 1px;
+  }
+  nav.toc .ver {
+    color: var(--highlight);
+    font-size: 12px;
+    margin-bottom: 24px;
+    font-weight: 600;
+  }
+  nav.toc ol { list-style: none; }
+  nav.toc li {
+    padding: 6px 0;
+    font-size: 13px;
+  }
+  nav.toc a {
+    color: var(--light);
+    text-decoration: none;
+    display: block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background 0.15s, color 0.15s;
+  }
+  nav.toc a:hover {
+    background: var(--card);
+    color: var(--highlight);
+  }
+  nav.toc .toc-num {
+    color: var(--dim);
+    font-weight: 700;
+    margin-right: 8px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  main { padding: 0; max-width: 1280px; }
+
+  section {
+    padding: 48px 56px;
+    border-bottom: 1px solid var(--border);
+  }
+  section:first-child { padding-top: 32px; }
+
+  h2 {
+    color: var(--white);
+    font-size: 30px;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+  }
+  h2 .anchor-num {
+    color: var(--accent);
+    font-weight: 800;
+    margin-right: 12px;
+    font-size: 22px;
+    vertical-align: 4px;
+  }
+  h3 {
+    color: var(--highlight);
+    font-size: 17px;
+    margin: 28px 0 12px 0;
+    font-weight: 600;
+  }
+  h4 {
+    color: var(--accent);
+    font-size: 13px;
+    margin: 18px 0 8px 0;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+  .lede {
+    color: var(--light);
+    font-size: 16px;
+    margin-bottom: 24px;
+    max-width: 850px;
+  }
+
+  /* Hero */
+  .hero {
+    background: linear-gradient(135deg, #0F2138 0%, #1B3A5E 100%);
+    padding: 56px 56px 40px 56px;
+    border-bottom: 1px solid var(--border);
+  }
+  .hero h1 {
+    font-size: 48px;
+    color: var(--white);
+    letter-spacing: -1px;
+    margin-bottom: 8px;
+  }
+  .hero .tagline {
+    color: var(--highlight);
+    font-size: 20px;
+    margin-bottom: 28px;
+  }
+  .hero-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-top: 24px;
+  }
+  .hero-stat {
+    background: rgba(0,0,0,0.25);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    text-align: center;
+  }
+  .hero-stat .big {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--white);
+    margin-bottom: 4px;
+    letter-spacing: -0.5px;
+  }
+  .hero-stat .big.green { color: var(--green); }
+  .hero-stat .small {
+    color: var(--dim);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--card);
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin: 12px 0;
+    border-left: 3px solid var(--accent);
+  }
+  .card.green   { border-left-color: var(--green); }
+  .card.red     { border-left-color: var(--red); }
+  .card.orange  { border-left-color: var(--orange); }
+  .card.highlight { border-left-color: var(--highlight); }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+
+  /* Table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 13px;
+  }
+  table th {
+    background: var(--card-hi);
+    color: var(--white);
+    text-align: left;
+    padding: 10px 12px;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border);
+  }
+  table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--light);
+  }
+  table tr:hover td { background: rgba(74,139,255,0.06); }
+  table td.center { text-align: center; }
+  table td .pos { color: var(--green); font-weight: 600; }
+  table td .neg { color: var(--red); font-weight: 600; }
+  table td .neutral { color: var(--dim); }
+  table td code, .code { font-family: 'SF Mono', Consolas, Monaco, monospace; font-size: 12px; color: var(--highlight); }
+
+  code, pre {
+    font-family: 'SF Mono', Consolas, Monaco, monospace;
+  }
+  code {
+    background: rgba(94,226,255,0.08);
+    color: var(--highlight);
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-size: 12px;
+  }
+  pre {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px 16px;
+    overflow-x: auto;
+    color: var(--light);
+    font-size: 12px;
+    line-height: 1.5;
+    margin: 12px 0;
+  }
+
+  details {
+    background: var(--card);
+    border-radius: 6px;
+    padding: 0;
+    margin: 8px 0;
+    border-left: 3px solid var(--dim);
+  }
+  details[open] { border-left-color: var(--accent); }
+  details summary {
+    padding: 12px 16px;
+    cursor: pointer;
+    color: var(--white);
+    font-weight: 600;
+    user-select: none;
+  }
+  details summary:hover { background: rgba(74,139,255,0.08); }
+  details summary .count {
+    color: var(--dim);
+    font-weight: 400;
+    font-size: 12px;
+    margin-left: 8px;
+  }
+  details .body {
+    padding: 4px 16px 16px 16px;
+    color: var(--light);
+  }
+
+  /* Feature pills */
+  .pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 0;
+  }
+  .pill {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    color: var(--light);
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-family: 'SF Mono', Consolas, monospace;
+  }
+  .pill.green { background: var(--bg-green); border-color: var(--green); color: var(--green); }
+  .pill.red   { background: var(--bg-red); border-color: var(--red); color: var(--red); }
+  .pill.orange{ background: var(--bg-orange); border-color: var(--orange); color: var(--orange); }
+  .pill.purple{ background: rgba(184,130,255,0.1); border-color: var(--purple); color: var(--purple); }
+  .pill.highlight{ background: rgba(94,226,255,0.1); border-color: var(--highlight); color: var(--highlight); }
+
+  /* SVG diagrams */
+  svg.diagram {
+    display: block;
+    background: var(--card);
+    border-radius: 6px;
+    margin: 16px 0;
+    border: 1px solid var(--border);
+  }
+  svg .label { font-family: -apple-system, sans-serif; fill: var(--white); font-size: 13px; }
+  svg .label-sm { font-family: -apple-system, sans-serif; fill: var(--light); font-size: 11px; }
+  svg .label-tiny { font-family: -apple-system, sans-serif; fill: var(--dim); font-size: 10px; }
+  svg .box { fill: var(--bg-2); stroke: var(--accent); stroke-width: 1.5; rx: 4; }
+  svg .box-green  { fill: var(--bg-green); stroke: var(--green); stroke-width: 1.5; rx: 4; }
+  svg .box-red    { fill: var(--bg-red); stroke: var(--red); stroke-width: 1.5; rx: 4; }
+  svg .box-orange { fill: var(--bg-orange); stroke: var(--orange); stroke-width: 1.5; rx: 4; }
+  svg .box-purple { fill: rgba(184,130,255,0.15); stroke: var(--purple); stroke-width: 1.5; rx: 4; }
+  svg .arrow      { stroke: var(--dim); stroke-width: 2; fill: none; marker-end: url(#arrow-dim); }
+  svg .arrow-red  { stroke: var(--red); stroke-width: 2; fill: none; marker-end: url(#arrow-red); }
+  svg .arrow-green{ stroke: var(--green); stroke-width: 2; fill: none; marker-end: url(#arrow-green); }
+
+  /* Banners */
+  .banner {
+    background: linear-gradient(135deg, rgba(74,139,255,0.12), rgba(94,226,255,0.05));
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: 14px 18px;
+    margin: 16px 0;
+    color: var(--light);
+    font-style: italic;
+  }
+  .banner.red {
+    background: linear-gradient(135deg, rgba(227,92,92,0.12), rgba(227,92,92,0.04));
+    border-color: var(--red);
+  }
+  .banner.green {
+    background: linear-gradient(135deg, rgba(76,194,122,0.12), rgba(76,194,122,0.04));
+    border-color: var(--green);
+  }
+  .banner strong { color: var(--white); font-weight: 700; }
+  .banner.red strong { color: var(--red); }
+  .banner.green strong { color: var(--green); }
+
+  .footnote { color: var(--dim); font-size: 12px; font-style: italic; margin-top: 8px; }
+
+  hr.sep {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 24px 0;
+  }
+
+  .key-value {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 8px 16px;
+    margin: 12px 0;
+  }
+  .key-value .k { color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .key-value .v { color: var(--light); font-size: 13px; }
+
+  .tag-success { background: var(--bg-green); color: var(--green); padding: 2px 8px; border-radius: 3px; font-weight: 600; font-size: 11px; }
+  .tag-warn { background: var(--bg-orange); color: var(--orange); padding: 2px 8px; border-radius: 3px; font-weight: 600; font-size: 11px; }
+  .tag-fail { background: var(--bg-red); color: var(--red); padding: 2px 8px; border-radius: 3px; font-weight: 600; font-size: 11px; }
+  .tag-new { background: rgba(94,226,255,0.15); color: var(--highlight); padding: 2px 8px; border-radius: 3px; font-weight: 600; font-size: 11px; }
+
+  footer {
+    padding: 32px 56px;
+    color: var(--dim);
+    text-align: center;
+    font-size: 12px;
+  }
+
+  /* Smooth scroll for anchors */
+  html { scroll-behavior: smooth; }
+  section { scroll-margin-top: 16px; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ============================================================ -->
+  <!-- SIDEBAR -->
+  <!-- ============================================================ -->
+  <nav class="toc">
+    <h1>EVASION</h1>
+    <div class="ver">v3.3.0 — detailed architecture</div>
+    <ol>
+      <li><a href="#overview"><span class="toc-num">01</span>Overview</a></li>
+      <li><a href="#topology"><span class="toc-num">02</span>System topology</a></li>
+      <li><a href="#data-flow"><span class="toc-num">03</span>Data flow</a></li>
+      <li><a href="#model-arch"><span class="toc-num">04</span>Model architecture</a></li>
+      <li><a href="#features"><span class="toc-num">05</span>Feature catalog</a></li>
+      <li><a href="#heads"><span class="toc-num">06</span>Prediction heads</a></li>
+      <li><a href="#losses"><span class="toc-num">07</span>Losses &amp; weights</a></li>
+      <li><a href="#training"><span class="toc-num">08</span>Training</a></li>
+      <li><a href="#ensemble"><span class="toc-num">09</span>Ensemble inference</a></li>
+      <li><a href="#leak"><span class="toc-num">10</span>The leak war story</a></li>
+      <li><a href="#hyperparams"><span class="toc-num">11</span>Hyperparameters</a></li>
+      <li><a href="#stack"><span class="toc-num">12</span>Tech stack</a></li>
+      <li><a href="#future"><span class="toc-num">13</span>Future work</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <!-- ============================================================ -->
+    <!-- HERO -->
+    <!-- ============================================================ -->
+    <div class="hero">
+      <h1>Evasion v3.3.0</h1>
+      <div class="tagline">Multi-task FT-Transformer for tabular police enforcement prediction</div>
+      <p style="color: var(--light); font-size: 14px; max-width: 800px;">
+        Single shared backbone produces 8 simultaneous predictions per traffic stop and per
+        cell&times;hour&times;day-of-week bin. Trained on 1.27M historical Montgomery County
+        Police stops with walk-forward 5-fold CV (skip fold 2 = degenerate). PLR tokenizer +
+        leak-safe target encoding + fold-aware citation rate. Deployed as v4.3.0-ensemble.
+      </p>
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <div class="big">1.27 M</div>
+          <div class="small">training stops</div>
+        </div>
+        <div class="hero-stat">
+          <div class="big">8</div>
+          <div class="small">prediction heads</div>
+        </div>
+        <div class="hero-stat">
+          <div class="big green">+14%</div>
+          <div class="small">composite vs XGBoost</div>
+        </div>
+        <div class="hero-stat">
+          <div class="big green">$4.36</div>
+          <div class="small">cost per full retrain</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 01 OVERVIEW -->
+    <!-- ============================================================ -->
+    <section id="overview">
+      <h2><span class="anchor-num">01</span>Overview</h2>
+      <p class="lede">
+        At a glance &mdash; what the model is, what it predicts, and why it matters.
+      </p>
+
+      <div class="grid-2">
+        <div>
+          <h3>What it is</h3>
+          <ul style="list-style: none; padding-left: 0;">
+            <li>&bull; <strong>Architecture:</strong> Feature Tokenizer Transformer (FT-T) &mdash; Gorishniy 2021</li>
+            <li>&bull; <strong>Multi-task:</strong> 1 shared backbone, 8 task heads</li>
+            <li>&bull; <strong>Tokenizer:</strong> Periodic-Linear (PLR) for numerics &mdash; Gorishniy 2022</li>
+            <li>&bull; <strong>Params:</strong> 1,136,160</li>
+            <li>&bull; <strong>Inputs:</strong> ~109 stop-numeric + 6 categorical embeddings</li>
+            <li>&bull; <strong>Validation:</strong> walk-forward 5-fold (skip fold 2), 4-fold ensemble</li>
+          </ul>
+        </div>
+        <div>
+          <h3>What it predicts</h3>
+          <ul style="list-style: none; padding-left: 0;">
+            <li>&bull; <code>occurrence</code> &mdash; expected stops per cell&times;hour&times;DOW (Poisson)</li>
+            <li>&bull; <code>speed_occurrence</code> &mdash; mobile-detected speed stops (Poisson)</li>
+            <li>&bull; <code>trap</code> &mdash; stationary-detected speed stops (Poisson)</li>
+            <li>&bull; <code>speed</code> &mdash; P(speed-related | stop) (Binary)</li>
+            <li>&bull; <code>search</code> &mdash; P(vehicle search | stop) (Binary)</li>
+            <li>&bull; <code>accident</code> &mdash; P(crash | stop) (Binary)</li>
+            <li>&bull; <code>injury</code> &mdash; P(injury | stop) (Binary)</li>
+            <li>&bull; <code>disposition</code> &mdash; P(citation vs warning | stop) (Binary, NEW v3.3.0)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="banner">
+        <strong>Composite score: +0.883</strong> across 4 ensembled folds &mdash; +14% over previous v3.2.0
+        and +0.883 over the XGBoost baseline.
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 02 SYSTEM TOPOLOGY -->
+    <!-- ============================================================ -->
+    <section id="topology">
+      <h2><span class="anchor-num">02</span>System Topology</h2>
+      <p class="lede">Four distinct compute environments, each picked for a specific job.</p>
+
+      <svg class="diagram" viewBox="0 0 900 460" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow-dim" viewBox="0 0 10 10" refX="9" refY="5"
+                  markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#7A889E"/>
+          </marker>
+          <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5"
+                  markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#4CC27A"/>
+          </marker>
+          <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5"
+                  markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#E35C5C"/>
+          </marker>
+        </defs>
+
+        <!-- Modal -->
+        <rect class="box" x="40" y="40" width="200" height="150"/>
+        <text class="label" x="140" y="65" text-anchor="middle" font-weight="bold">MODAL CLOUD</text>
+        <text class="label-sm" x="140" y="90" text-anchor="middle">4× NVIDIA L4 GPUs</text>
+        <text class="label-sm" x="140" y="108" text-anchor="middle">$0.80/hr each</text>
+        <text class="label-sm" x="140" y="126" text-anchor="middle">24 GB VRAM/container</text>
+        <text class="label-tiny" x="140" y="155" text-anchor="middle">→ Production training</text>
+        <text class="label-tiny" x="140" y="170" text-anchor="middle">~108 min, $4.36 per retrain</text>
+
+        <!-- Laptop -->
+        <rect class="box" x="40" y="240" width="200" height="150"/>
+        <text class="label" x="140" y="265" text-anchor="middle" font-weight="bold">LAPTOP</text>
+        <text class="label-sm" x="140" y="290" text-anchor="middle">Windows + RTX A4000</text>
+        <text class="label-sm" x="140" y="308" text-anchor="middle">8 GB VRAM</text>
+        <text class="label-tiny" x="140" y="335" text-anchor="middle">→ Orchestration</text>
+        <text class="label-tiny" x="140" y="350" text-anchor="middle">→ Ensemble inference</text>
+        <text class="label-tiny" x="140" y="365" text-anchor="middle">→ Modal launcher</text>
+
+        <!-- Server -->
+        <rect class="box" x="350" y="140" width="200" height="200"/>
+        <text class="label" x="450" y="165" text-anchor="middle" font-weight="bold">SERVER</text>
+        <text class="label-sm" x="450" y="190" text-anchor="middle">Debian 16-core AVX-512</text>
+        <text class="label-sm" x="450" y="208" text-anchor="middle">125 GB RAM, datacenter</text>
+        <text class="label-tiny" x="450" y="240" text-anchor="middle">→ Postgres + PostGIS DB</text>
+        <text class="label-tiny" x="450" y="255" text-anchor="middle">→ Next.js standalone</text>
+        <text class="label-tiny" x="450" y="270" text-anchor="middle">→ Pipeline service (ML)</text>
+        <text class="label-tiny" x="450" y="285" text-anchor="middle">→ Feature engineering</text>
+        <text class="label-tiny" x="450" y="300" text-anchor="middle">→ User-facing endpoint</text>
+
+        <!-- Desktop -->
+        <rect class="box" x="660" y="40" width="200" height="150"/>
+        <text class="label" x="760" y="65" text-anchor="middle" font-weight="bold">DESKTOP</text>
+        <text class="label-sm" x="760" y="90" text-anchor="middle">Windows + RTX 4070 SUPER</text>
+        <text class="label-sm" x="760" y="108" text-anchor="middle">12 GB VRAM</text>
+        <text class="label-tiny" x="760" y="135" text-anchor="middle">→ Heavier dev GPU</text>
+        <text class="label-tiny" x="760" y="150" text-anchor="middle">→ Worker container</text>
+        <text class="label-tiny" x="760" y="165" text-anchor="middle">  (HTTPS to server)</text>
+
+        <!-- Friend desktops -->
+        <rect class="box" x="660" y="240" width="200" height="150"/>
+        <text class="label" x="760" y="265" text-anchor="middle" font-weight="bold">FRIEND GPUs</text>
+        <text class="label-sm" x="760" y="290" text-anchor="middle">Same worker container</text>
+        <text class="label-sm" x="760" y="308" text-anchor="middle">Outbound HTTPS only</text>
+        <text class="label-tiny" x="760" y="335" text-anchor="middle">→ NAT-friendly</text>
+        <text class="label-tiny" x="760" y="350" text-anchor="middle">→ Bootstrap one-liner</text>
+        <text class="label-tiny" x="760" y="365" text-anchor="middle">→ Optional capacity</text>
+
+        <!-- Arrows -->
+        <line class="arrow" x1="240" y1="110" x2="350" y2="200"/>
+        <line class="arrow" x1="240" y1="320" x2="350" y2="270"/>
+        <line class="arrow" x1="660" y1="110" x2="550" y2="200"/>
+        <line class="arrow" x1="660" y1="320" x2="550" y2="270"/>
+
+        <text class="label-tiny" x="285" y="155" text-anchor="middle">modal CLI</text>
+        <text class="label-tiny" x="290" y="305" text-anchor="middle">SSH / SCP</text>
+        <text class="label-tiny" x="610" y="155" text-anchor="middle">HTTPS</text>
+        <text class="label-tiny" x="610" y="305" text-anchor="middle">HTTPS</text>
+
+        <!-- Users -->
+        <rect class="box-green" x="350" y="380" width="200" height="60"/>
+        <text class="label" x="450" y="408" text-anchor="middle" font-weight="bold" fill="#4CC27A">USERS (browsers)</text>
+        <text class="label-sm" x="450" y="427" text-anchor="middle">evasion.run</text>
+        <line class="arrow-green" x1="450" y1="380" x2="450" y2="345"/>
+      </svg>
+
+      <h3>Compute routing rules</h3>
+      <table>
+        <tr><th>Workload</th><th>Where</th><th>Why</th></tr>
+        <tr><td>Pipeline 01-09 (CPU feature engineering)</td><td>Server</td><td>16-core AVX-512, 125 GB RAM. Laptop OOMs on 1M+ rows.</td></tr>
+        <tr><td>Full model retrain (60 ep × 4 folds)</td><td>Modal (4× L4)</td><td>$4 spend, 2hr wall, parallel scaling</td></tr>
+        <tr><td>Smoke tests (5 ep, 1 fold)</td><td>Laptop or desktop</td><td>Free, fast iteration</td></tr>
+        <tr><td>Ensemble inference</td><td>Laptop A4000</td><td>~15 min, ~1.84 GB VRAM per fold</td></tr>
+        <tr><td>Deploy to prod DB</td><td>Server (via SSH)</td><td>DB lives there, single psycopg2 connection</td></tr>
+        <tr><td>Web app (heatmap serving)</td><td>Server</td><td>Next.js standalone behind Caddy</td></tr>
+      </table>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 03 DATA FLOW -->
+    <!-- ============================================================ -->
+    <section id="data-flow">
+      <h2><span class="anchor-num">03</span>Data Flow &mdash; from raw stops to live heatmap</h2>
+      <p class="lede">14 stages spanning ingestion, preprocessing, training, inference, and deployment.</p>
+
+      <table>
+        <tr><th style="width: 5%;">#</th><th style="width: 25%;">Stage</th><th style="width: 20%;">Where</th><th>What happens</th></tr>
+        <tr><td>1</td><td><strong>Source data</strong></td><td>MoCo public CSV</td><td>2.4M traffic violations from Montgomery County Police on Socrata, since 2012</td></tr>
+        <tr><td>2</td><td><strong>Pipeline 01-02</strong></td><td>Server</td><td>Spatial join with road geometry + POI features</td></tr>
+        <tr><td>3</td><td><strong>Pipeline 03</strong></td><td>Server</td><td>Feature engineering &rarr; <code>stops_features.parquet</code> (247 cols × 1.27M rows)</td></tr>
+        <tr><td>4</td><td><strong>Pipeline 07-09</strong></td><td>Server</td><td>Build occurrence bins + cell-level lens stats (6 fold-aware variants)</td></tr>
+        <tr><td>5</td><td><strong>SCP to laptop</strong></td><td>Laptop</td><td>Pull 273 MB of parquets to laptop (~5 min over WAN)</td></tr>
+        <tr><td>6</td><td><strong>Modal volume put</strong></td><td>Laptop &rarr; Modal</td><td>Upload parquets to <code>evasion-features</code> shared volume</td></tr>
+        <tr><td>7</td><td><strong>Modal training</strong></td><td>4× L4 cloud</td><td>4 folds in parallel via <code>.starmap()</code>, ~108 min total wall</td></tr>
+        <tr><td>8</td><td><strong>Checkpoint save</strong></td><td>Modal</td><td>4× <code>.pt</code> files per fold + per-head specialists, to <code>evasion-checkpoints</code> volume</td></tr>
+        <tr><td>9</td><td><strong>Modal volume get</strong></td><td>Modal &rarr; Laptop</td><td>Pull all checkpoints back to laptop (~2 min)</td></tr>
+        <tr><td>10</td><td><strong>Ensemble inference</strong></td><td>Laptop A4000</td><td><code>predict_multi_ensemble.py</code> &mdash; auto-detects v3.3.0 ckpts, runs 4-fold avg</td></tr>
+        <tr><td>11</td><td><strong>Output parquets</strong></td><td>Laptop</td><td><code>stop_predictions_v4_ensemble.parquet</code> + <code>bin_predictions_v4_ensemble.parquet</code></td></tr>
+        <tr><td>12</td><td><strong>SCP to server</strong></td><td>Laptop &rarr; Server</td><td>Push prediction parquets to server</td></tr>
+        <tr><td>13</td><td><strong>Upload to prod DB</strong></td><td>Server</td><td><code>upload_bin_predictions_v4_ensemble.py</code> &mdash; inserts ~333K rows tagged <code>v4.3.0-ensemble</code></td></tr>
+        <tr><td>14</td><td><strong>User views heatmap</strong></td><td>Browser</td><td>Mapbox renders cells from <code>/api/predictions/heatmap?model=v4.3.0-ensemble</code></td></tr>
+      </table>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 04 MODEL ARCHITECTURE -->
+    <!-- ============================================================ -->
+    <section id="model-arch">
+      <h2><span class="anchor-num">04</span>Model Architecture</h2>
+      <p class="lede">FT-Transformer with PLR numeric tokenization, 4 transformer blocks, 8 task heads.</p>
+
+      <svg class="diagram" viewBox="0 0 1100 540" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="ar-acc" viewBox="0 0 10 10" refX="9" refY="5"
+                  markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#4A8BFF"/>
+          </marker>
+        </defs>
+
+        <!-- Inputs left column -->
+        <rect class="box" x="20" y="40" width="200" height="60"/>
+        <text class="label" x="120" y="62" text-anchor="middle" font-weight="bold">85 numeric features</text>
+        <text class="label-sm" x="120" y="82" text-anchor="middle">temporal, road, POI, weather…</text>
+
+        <rect class="box-purple" x="20" y="135" width="200" height="60"/>
+        <text class="label" x="120" y="157" text-anchor="middle" font-weight="bold" fill="#B882FF">6 categorical features</text>
+        <text class="label-sm" x="120" y="177" text-anchor="middle">vehicle_make (3760), road…</text>
+
+        <rect class="box" x="20" y="230" width="200" height="60"/>
+        <text class="label" x="120" y="252" text-anchor="middle" font-weight="bold">24 runtime TE cols</text>
+        <text class="label-sm" x="120" y="272" text-anchor="middle">cat × binary target encoding</text>
+
+        <rect class="box" x="20" y="325" width="200" height="60"/>
+        <text class="label" x="120" y="347" text-anchor="middle" font-weight="bold">~80 cell features</text>
+        <text class="label-sm" x="120" y="367" text-anchor="middle">aggregated per H3 cell</text>
+
+        <!-- Tokenizers -->
+        <rect class="box-orange" x="280" y="40" width="160" height="60"/>
+        <text class="label" x="360" y="62" text-anchor="middle" font-weight="bold" fill="#FF9E4D">PLR tokenizer</text>
+        <text class="label-sm" x="360" y="82" text-anchor="middle">[x, sin(2πWx), cos(2πWx)]</text>
+
+        <rect class="box-purple" x="280" y="135" width="160" height="60"/>
+        <text class="label" x="360" y="157" text-anchor="middle" font-weight="bold" fill="#B882FF">Embeddings</text>
+        <text class="label-sm" x="360" y="177" text-anchor="middle">nn.Embedding(N, 128)</text>
+
+        <rect class="box" x="280" y="230" width="160" height="60"/>
+        <text class="label" x="360" y="252" text-anchor="middle" font-weight="bold">Linear proj</text>
+        <text class="label-sm" x="360" y="272" text-anchor="middle">→ 128-d each</text>
+
+        <rect class="box" x="280" y="325" width="160" height="60"/>
+        <text class="label" x="360" y="347" text-anchor="middle" font-weight="bold">Cell encoder</text>
+        <text class="label-sm" x="360" y="367" text-anchor="middle">MLP → 128</text>
+
+        <!-- FeatureTokenizer -->
+        <rect class="box" x="490" y="135" width="180" height="180"/>
+        <text class="label" x="580" y="160" text-anchor="middle" font-weight="bold">FeatureTokenizer</text>
+        <text class="label-sm" x="580" y="180" text-anchor="middle">+ [CLS] token</text>
+        <text class="label-tiny" x="580" y="210" text-anchor="middle">concat all</text>
+        <text class="label-tiny" x="580" y="225" text-anchor="middle">128-d tokens</text>
+        <text class="label-tiny" x="580" y="240" text-anchor="middle">→ sequence of</text>
+        <text class="label-tiny" x="580" y="255" text-anchor="middle">~110 tokens</text>
+        <text class="label-tiny" x="580" y="285" text-anchor="middle" fill="#5EE2FF">d_token = 128</text>
+
+        <!-- Transformer -->
+        <rect class="box" x="720" y="135" width="180" height="180"/>
+        <text class="label" x="810" y="160" text-anchor="middle" font-weight="bold">4× Transformer</text>
+        <text class="label" x="810" y="180" text-anchor="middle" font-weight="bold">Block</text>
+        <text class="label-tiny" x="810" y="210" text-anchor="middle">multi-head attn</text>
+        <text class="label-tiny" x="810" y="225" text-anchor="middle">8 heads</text>
+        <text class="label-tiny" x="810" y="245" text-anchor="middle">FFN (ReLU/ReGLU)</text>
+        <text class="label-tiny" x="810" y="260" text-anchor="middle">residual + norm</text>
+        <text class="label-tiny" x="810" y="290" text-anchor="middle" fill="#5EE2FF">attn dropout 0.2</text>
+
+        <!-- CLS extractor -->
+        <rect class="box-green" x="950" y="190" width="120" height="70"/>
+        <text class="label" x="1010" y="215" text-anchor="middle" font-weight="bold" fill="#4CC27A">[CLS]</text>
+        <text class="label-sm" x="1010" y="235" text-anchor="middle">128-d shared</text>
+        <text class="label-sm" x="1010" y="252" text-anchor="middle">representation</text>
+
+        <!-- Heads -->
+        <rect class="box-orange" x="950" y="290" width="120" height="50"/>
+        <text class="label-sm" x="1010" y="310" text-anchor="middle" font-weight="bold" fill="#FF9E4D">3 Poisson heads</text>
+        <text class="label-tiny" x="1010" y="328" text-anchor="middle">log-rate + NLL</text>
+
+        <rect class="box-purple" x="950" y="350" width="120" height="50"/>
+        <text class="label-sm" x="1010" y="370" text-anchor="middle" font-weight="bold" fill="#B882FF">5 Binary heads</text>
+        <text class="label-tiny" x="1010" y="388" text-anchor="middle">sigmoid + BCE</text>
+
+        <!-- Arrows from inputs to tokenizers -->
+        <line class="arrow" x1="220" y1="70" x2="280" y2="70"/>
+        <line class="arrow" x1="220" y1="165" x2="280" y2="165"/>
+        <line class="arrow" x1="220" y1="260" x2="280" y2="260"/>
+        <line class="arrow" x1="220" y1="355" x2="280" y2="355"/>
+
+        <!-- Arrows from tokenizers to FeatureTokenizer -->
+        <line class="arrow" x1="440" y1="70" x2="490" y2="170"/>
+        <line class="arrow" x1="440" y1="165" x2="490" y2="200"/>
+        <line class="arrow" x1="440" y1="260" x2="490" y2="240"/>
+        <line class="arrow" x1="440" y1="355" x2="490" y2="280"/>
+
+        <!-- Arrow FeatureTokenizer → Transformer -->
+        <line class="arrow" x1="670" y1="225" x2="720" y2="225"/>
+
+        <!-- Arrow Transformer → CLS -->
+        <line class="arrow" x1="900" y1="225" x2="950" y2="225"/>
+
+        <!-- CLS → heads -->
+        <line class="arrow" x1="1010" y1="260" x2="1010" y2="290"/>
+        <line class="arrow" x1="1010" y1="340" x2="1010" y2="350"/>
+
+        <!-- Footer note -->
+        <text class="label-tiny" x="550" y="430" text-anchor="middle">Total params: 1,136,160</text>
+        <text class="label-tiny" x="550" y="448" text-anchor="middle" fill="#5EE2FF">d_token=128 · n_layers=4 · n_heads=8 · n_periodic_freqs=8</text>
+        <text class="label-tiny" x="550" y="466" text-anchor="middle">leak_safe=True (drops is_post_covid + is_covid_era)</text>
+        <text class="label-tiny" x="550" y="490" text-anchor="middle">Loss = weighted sum of 8 head losses (weights sum = 1.00)</text>
+      </svg>
+
+      <h3>Component breakdown</h3>
+      <div class="grid-2">
+        <div class="card">
+          <h4 style="color: var(--orange);">PLR Tokenizer</h4>
+          <p>For each numeric feature <code>x</code>, produce <code>[x, sin(2πW₁x), cos(2πW₁x), ..., sin(2πWₖx), cos(2πWₖx)]</code> with k=8 learned frequencies, then linear-project to 128-d. Captures cyclic structure (hour, longitude) better than raw linear projection.</p>
+        </div>
+        <div class="card">
+          <h4 style="color: var(--purple);">Categorical Embeddings</h4>
+          <p>Each categorical gets <code>nn.Embedding(N, 128)</code>. <code>vehicle_make</code> (3,760 unique values) gets a 481K-param embedding table that the model learns end-to-end &mdash; similar makes converge to similar vectors.</p>
+        </div>
+        <div class="card">
+          <h4>Transformer Block</h4>
+          <p>Standard pre-norm transformer: multi-head self-attention (8 heads, d_token=128) → residual → FFN (ReGLU activation) → residual. 4 blocks stacked. Self-attention lets each feature "look at" all others to learn interactions.</p>
+        </div>
+        <div class="card">
+          <h4 style="color: var(--green);">[CLS] Token</h4>
+          <p>Special learnable token prepended to feature sequence. After 4 transformer blocks, its 128-d output is the dataset-level summary &mdash; the input every task head reads from.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 05 FEATURES -->
+    <!-- ============================================================ -->
+    <section id="features">
+      <h2><span class="anchor-num">05</span>Feature Catalog</h2>
+      <p class="lede">~200 effective features per stop. Click a section to expand.</p>
+
+      <details>
+        <summary>Per-stop categorical (6) <span class="count">— embedded as 128-d vectors</span></summary>
+        <div class="body">
+          <table>
+            <tr><th>Feature</th><th>Cardinality</th><th>Examples</th></tr>
+            <tr><td><code>sub_agency</code></td><td>~9</td><td>MCP districts (1D, 2D, 3D, …)</td></tr>
+            <tr><td><code>vehicle_type</code></td><td>~35</td><td>Sedan, SUV, Truck, Motorcycle</td></tr>
+            <tr><td><code>vehicle_make</code></td><td><strong>3,760</strong></td><td>Honda, Tesla, Ford, BMW, …</td></tr>
+            <tr><td><code>road_class</code></td><td>~15</td><td>Motorway, Primary, Residential</td></tr>
+            <tr><td><code>road_surface</code></td><td>~10</td><td>Asphalt, Concrete, Dirt</td></tr>
+            <tr><td><code>arrest_type_letter</code></td><td>19 + UNK</td><td>A–S codes (replaces violation_type from v3.3.0)</td></tr>
+          </table>
+          <p class="footnote">Same 6 categoricals also feed runtime target encoders → 6 × 4 binary targets = 24 TE cols.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Temporal (24) <span class="count">— time of stop, cyclical encodings</span></summary>
+        <div class="body">
+          <div class="pills">
+            <span class="pill">hour</span><span class="pill">minute</span><span class="pill">day_of_week</span>
+            <span class="pill">month</span><span class="pill">quarter</span><span class="pill">year</span>
+            <span class="pill">hour_sin</span><span class="pill">hour_cos</span>
+            <span class="pill">dow_sin</span><span class="pill">dow_cos</span>
+            <span class="pill">month_sin</span><span class="pill">month_cos</span>
+            <span class="pill">doy_sin</span><span class="pill">doy_cos</span>
+            <span class="pill">is_weekend</span>
+            <span class="pill">is_rush_hour_morning</span><span class="pill">is_rush_hour_evening</span>
+            <span class="pill">is_night</span><span class="pill">is_late_night</span>
+            <span class="pill">is_school_zone_hour</span><span class="pill">is_bar_close_hour</span>
+            <span class="pill">is_us_federal_holiday</span><span class="pill">days_until_weekend</span>
+            <span class="pill">days_since_dataset_start</span>
+            <span class="pill">hour_since_shift_start</span>
+          </div>
+          <p class="footnote"><code>is_covid_era</code> + <code>is_post_covid</code> dropped via <code>--leak-safe</code> in v3.3.0 (correlated with is_citation).</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Road geometry (16) <span class="count">— OSM road segment + derived</span></summary>
+        <div class="body">
+          <div class="pills">
+            <span class="pill">road_maxspeed</span><span class="pill">road_lanes</span>
+            <span class="pill">road_curvature</span><span class="pill">road_sinuosity</span>
+            <span class="pill">road_max_turn</span><span class="pill">road_switchbacks</span>
+            <span class="pill">road_elev_gain</span><span class="pill">road_elev_loss</span>
+            <span class="pill">road_max_grade</span>
+            <span class="pill">road_clubsport</span><span class="pill">road_backroads</span><span class="pill">road_grandtour</span>
+            <span class="pill">snap_distance_m</span><span class="pill">curvature_per_mi</span>
+            <span class="pill">stop_on_curvy_road</span><span class="pill">stop_on_mountain_pass</span>
+          </div>
+        </div>
+      </details>
+
+      <details>
+        <summary>POI distances + interactions (19) <span class="count">— derived spatial features</span></summary>
+        <div class="body">
+          <div class="pills">
+            <span class="pill">dist_police_m</span><span class="pill">dist_school_m</span>
+            <span class="pill">dist_hospital_m</span><span class="pill">dist_fire_station_m</span>
+            <span class="pill">dist_courthouse_m</span><span class="pill">dist_university_m</span>
+            <span class="pill">dist_park_m</span><span class="pill">dist_mall_m</span>
+            <span class="pill">log_dist_police_m</span><span class="pill">log_dist_school_m</span>
+            <span class="pill">log_dist_hospital_m</span>
+            <span class="pill">is_in_school_zone</span><span class="pill">is_near_hospital</span>
+            <span class="pill">is_near_police_station</span><span class="pill">is_near_courthouse</span>
+            <span class="pill">is_in_urban_core</span>
+            <span class="pill">school_zone_during_hours</span><span class="pill">urban_core_late_night</span>
+            <span class="pill">avg_dist_top3_poi_m</span>
+          </div>
+          <p class="footnote">Computed via spatial join with OSM POI extracts. <strong>Stop signs not in POI list</strong> — only used as violation attribute (<code>is_stop_sign_related</code>, downstream of XGBoost baseline only).</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Speed cameras (3) <span class="count">— spatial join with camera DB</span></summary>
+        <div class="body">
+          <div class="pills">
+            <span class="pill">dist_speed_camera_m</span>
+            <span class="pill">is_near_speed_camera_500m</span>
+            <span class="pill">speed_cameras_within_500m</span>
+          </div>
+          <p class="footnote">Distance + binary + count features per stop. Cell-level aggregates (means) also fed to Poisson heads.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Vehicle (10) <span class="count">— per-stop binary + numeric</span></summary>
+        <div class="body">
+          <div class="pills">
+            <span class="pill">vehicle_age</span>
+            <span class="pill">is_truck</span><span class="pill">is_motorcycle</span>
+            <span class="pill">is_suv</span><span class="pill">is_sedan</span>
+            <span class="pill">is_van</span><span class="pill">is_commercial</span>
+            <span class="pill">is_luxury</span><span class="pill">is_performance</span>
+            <span class="pill">vehicle_year_decade</span>
+          </div>
+        </div>
+      </details>
+
+      <details>
+        <summary>Driver origin (3) <span class="count">— license-plate state</span></summary>
+        <div class="body">
+          <div class="pills">
+            <span class="pill">is_out_of_state</span>
+            <span class="pill">is_neighbor_state</span>
+            <span class="pill">is_far_state</span>
+          </div>
+        </div>
+      </details>
+
+      <details>
+        <summary>Holiday flags (4) <span class="count">— per-stop temporal flags</span></summary>
+        <div class="body">
+          <div class="pills">
+            <span class="pill">is_dui_crackdown_holiday</span>
+            <span class="pill">is_travel_holiday</span>
+            <span class="pill">is_holiday_weekend</span>
+            <span class="pill">days_to_nearest_holiday</span>
+          </div>
+        </div>
+      </details>
+
+      <details>
+        <summary>AADT — traffic exposure (4) <span class="count">— federal/state DOT</span></summary>
+        <div class="body">
+          <div class="pills">
+            <span class="pill">aadt_log</span><span class="pill">aadt_f_system</span>
+            <span class="pill">aadt_truck_pct</span><span class="pill">aadt_is_reliable</span>
+          </div>
+          <p class="footnote">AADT = Annual Average Daily Traffic — a measure of road exposure used by DOT for resource allocation.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Crash history (5) <span class="count">— historical accident locations</span></summary>
+        <div class="body">
+          <div class="pills">
+            <span class="pill">crashes_within_500m</span><span class="pill">crashes_within_1km</span>
+            <span class="pill">fatal_crashes_within_1km</span>
+            <span class="pill">injury_crashes_within_500m</span>
+            <span class="pill">is_crash_hotspot</span>
+          </div>
+        </div>
+      </details>
+
+      <details>
+        <summary>Weather (7) <span class="count">— per-stop conditions at time of incident</span></summary>
+        <div class="body">
+          <div class="pills">
+            <span class="pill">temperature_c</span><span class="pill">precipitation_mm</span>
+            <span class="pill">is_rain</span><span class="pill">is_heavy_rain</span>
+            <span class="pill">is_snow</span><span class="pill">visibility_m</span>
+            <span class="pill">wind_speed_kph</span>
+          </div>
+        </div>
+      </details>
+
+      <details>
+        <summary>Demographic + reg-state aggregates (10) <span class="count">— cell-level, broadcast to per-stop</span></summary>
+        <div class="body">
+          <div class="pills">
+            <span class="pill">belts_frac</span><span class="pill">commercial_veh_frac</span>
+            <span class="pill">hazmat_frac</span><span class="pill">contrib_accident_frac</span>
+            <span class="pill">male_frac</span>
+            <span class="pill">reg_state_MD_frac</span><span class="pill">reg_state_far_frac</span>
+            <span class="pill">dl_state_diversity</span><span class="pill">race_entropy</span>
+            <span class="pill">csv_era_stops</span>
+          </div>
+        </div>
+      </details>
+
+      <details>
+        <summary>Rolling history (5) <span class="count">— recent stop activity in this cell</span></summary>
+        <div class="body">
+          <div class="pills">
+            <span class="pill">stops_last_7d</span><span class="pill">stops_last_30d</span><span class="pill">stops_last_90d</span>
+            <span class="pill">days_since_last_stop_here</span>
+            <span class="pill">stops_trending_up</span>
+          </div>
+        </div>
+      </details>
+
+      <details>
+        <summary>Lens stats (8) <span class="count">— behavioral cell signals</span></summary>
+        <div class="body">
+          <div class="pills">
+            <span class="pill highlight">citation_rate</span>
+            <span class="pill">strictness_speed_over</span><span class="pill">strictness_p75</span>
+            <span class="pill">frac_luxury</span><span class="pill">frac_performance</span>
+            <span class="pill">frac_motorcycle</span>
+            <span class="pill">frac_pickup</span><span class="pill">frac_commercial</span>
+          </div>
+          <p class="footnote"><code>citation_rate</code> is <strong>fold-aware</strong> in v3.3.0 — see <a href="#leak" style="color: var(--highlight);">leak war story</a>.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Per-cell features for Poisson heads (~80) <span class="count">— full list</span></summary>
+        <div class="body">
+          <h4>Location & road</h4>
+          <div class="pills">
+            <span class="pill">cell_lat</span><span class="pill">cell_lng</span>
+            <span class="pill">road_maxspeed_mean</span><span class="pill">road_maxspeed_max</span>
+            <span class="pill">road_curvature_mean</span><span class="pill">road_sinuosity_mean</span>
+            <span class="pill">road_max_grade_max</span><span class="pill">road_lanes_mean</span>
+            <span class="pill">is_highway_cell</span><span class="pill">highway_stop_frac</span>
+          </div>
+
+          <h4>POI cell aggregates</h4>
+          <div class="pills">
+            <span class="pill">dist_police_mean</span><span class="pill">dist_school_mean</span>
+            <span class="pill">dist_hospital_mean</span><span class="pill">dist_fire_mean</span>
+            <span class="pill">dist_court_mean</span>
+          </div>
+
+          <h4>Cell history & composition</h4>
+          <div class="pills">
+            <span class="pill">stops_7d_mean</span><span class="pill">stops_30d_mean</span><span class="pill">stops_90d_mean</span>
+            <span class="pill">speed_frac</span><span class="pill">search_frac</span>
+            <span class="pill">radar_frac</span><span class="pill">laser_frac</span><span class="pill">patrol_frac</span>
+            <span class="pill">us_federal_holiday_frac</span><span class="pill">dui_crackdown_holiday_frac</span>
+            <span class="pill">travel_holiday_frac</span><span class="pill">holiday_weekend_frac</span>
+          </div>
+          <p class="footnote">Note: <code>speed_frac</code>, <code>search_frac</code> zeroed in StopMultiDataset (leak per-stop); safe for cell-level bins.</p>
+
+          <h4>Speed cameras (cell)</h4>
+          <div class="pills">
+            <span class="pill">dist_speed_camera_mean</span><span class="pill">near_speed_camera_frac</span><span class="pill">cameras_within_500m_mean</span>
+          </div>
+
+          <h4>Phase 0A/E enforcement axes</h4>
+          <div class="pills">
+            <span class="pill">stationary_trap_frac</span><span class="pill">mobile_enforcement_frac</span>
+            <span class="pill">marked_frac</span><span class="pill">unmarked_frac</span><span class="pill">automated_frac</span>
+          </div>
+
+          <h4>Phase 0E enthusiast composites</h4>
+          <div class="pills">
+            <span class="pill">canyon_speed_trap_score</span><span class="pill">unmarked_radar_frac</span>
+            <span class="pill">laser_extreme_combo_frac</span><span class="pill">curvy_night_frac</span>
+          </div>
+
+          <h4>Phase 0D vehicle-targeting log-ratios</h4>
+          <div class="pills">
+            <span class="pill">luxury_targeting_logratio</span>
+            <span class="pill">performance_targeting_logratio</span>
+            <span class="pill">motorcycle_targeting_logratio</span>
+            <span class="pill">out_of_state_targeting_logratio</span>
+            <span class="pill">enthusiast_targeting_score</span><span class="pill">unusual_vehicle_score</span>
+            <span class="pill">organized_frac</span><span class="pill">laser_dominance</span>
+            <span class="pill">intent_score</span>
+            <span class="pill">excessive_speed_frac</span><span class="pill">extreme_speed_frac</span>
+          </div>
+        </div>
+      </details>
+
+      <details>
+        <summary>Runtime target encoders (24) <span class="count">— fold-safe TE × Bayesian smoothing</span></summary>
+        <div class="body">
+          <p>Computed on <strong>train+val split per fold</strong> with <code>FoldSafeTargetEncoder(smoothing=20)</code>.</p>
+          <p>Generated columns (6 categoricals × 4 binary targets):</p>
+          <div class="pills">
+            <span class="pill">sub_agency_te_is_speed_related</span><span class="pill">sub_agency_te_search_conducted</span>
+            <span class="pill">sub_agency_te_accident</span><span class="pill">sub_agency_te_personal_injury</span>
+            <span class="pill">vehicle_type_te_is_speed_related</span><span class="pill">vehicle_type_te_search_conducted</span>
+            <span class="pill">vehicle_type_te_accident</span><span class="pill">vehicle_type_te_personal_injury</span>
+            <span class="pill">vehicle_make_te_is_speed_related</span><span class="pill">vehicle_make_te_search_conducted</span>
+            <span class="pill">vehicle_make_te_accident</span><span class="pill">vehicle_make_te_personal_injury</span>
+            <span class="pill">road_class_te_is_speed_related</span><span class="pill">road_class_te_search_conducted</span>
+            <span class="pill">road_class_te_accident</span><span class="pill">road_class_te_personal_injury</span>
+            <span class="pill">road_surface_te_is_speed_related</span><span class="pill">road_surface_te_search_conducted</span>
+            <span class="pill">road_surface_te_accident</span><span class="pill">road_surface_te_personal_injury</span>
+            <span class="pill">arrest_type_letter_te_is_speed_related</span><span class="pill">arrest_type_letter_te_search_conducted</span>
+            <span class="pill">arrest_type_letter_te_accident</span><span class="pill">arrest_type_letter_te_personal_injury</span>
+          </div>
+          <div class="banner red">
+            <strong>DO NOT add <code style="color: var(--red);">is_citation</code> to TE_BINARY_TARGETS</strong> &mdash;
+            doing so would create <code>arrest_type_letter_te_is_citation</code> which would re-introduce
+            disposition leakage. The lessons learned from v3.3.0 are documented in the leak section.
+          </div>
+        </div>
+      </details>
+
+      <details>
+        <summary>What's NOT used (worth knowing) <span class="count">— excluded from the model</span></summary>
+        <div class="body">
+          <table>
+            <tr><th>Feature</th><th>Why excluded</th></tr>
+            <tr><td><code>is_stop_sign_related</code></td><td>Used by XGBoost baseline only. Not in FT-T's STOP_NUMERIC_FEATURES.</td></tr>
+            <tr><td><code>stop_sign_type</code></td><td>Same as above. Could be added in v3.4.0 as cell-level aggregate.</td></tr>
+            <tr><td><code>violation_type</code> / <code>violation_type_top</code></td><td><strong>REMOVED v3.3.0</strong> &mdash; caused disposition leak (target derived from this column).</td></tr>
+            <tr><td>Raw <code>latitude</code> / <code>longitude</code></td><td>Replaced with H3 cell + per-cell aggregates for better generalization.</td></tr>
+            <tr><td><code>arrest_type</code> (full text)</td><td>Replaced with <code>arrest_type_letter</code> (single char) for v3.3.0.</td></tr>
+            <tr><td>Free-text fields (<code>description</code>)</td><td>Not modeled directly; extracted into derived flags via regex (e.g. <code>is_stop_sign_related</code>).</td></tr>
+            <tr><td><code>created_at</code> / <code>stop_id</code></td><td>IDs / metadata, not predictive.</td></tr>
+          </table>
+        </div>
+      </details>
+
+      <hr class="sep">
+      <h3>Summary count</h3>
+      <table>
+        <tr><th>Category</th><th>Count</th></tr>
+        <tr><td>Per-stop categorical (with embeddings)</td><td>6</td></tr>
+        <tr><td>Per-stop numeric (with PLR tokenizer)</td><td>~85</td></tr>
+        <tr><td>Per-cell aggregates (Poisson heads)</td><td>~80</td></tr>
+        <tr><td>Time features</td><td>12</td></tr>
+        <tr><td>Runtime target encoders</td><td>24</td></tr>
+        <tr><td><strong>Total per-stop features into model</strong></td><td><strong>~109 (numeric) + 6 (cat embeds) ≈ 115</strong></td></tr>
+      </table>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 06 PREDICTION HEADS -->
+    <!-- ============================================================ -->
+    <section id="heads">
+      <h2><span class="anchor-num">06</span>Prediction Heads</h2>
+      <p class="lede">Each head reads from the same shared [CLS] embedding. 3 Poisson + 5 binary.</p>
+
+      <table>
+        <tr>
+          <th>Head</th>
+          <th>Type</th>
+          <th>Granularity</th>
+          <th>What it predicts</th>
+          <th>Pos rate</th>
+          <th>Loss</th>
+          <th>Weight</th>
+        </tr>
+        <tr>
+          <td><code>occurrence</code></td>
+          <td><span class="pill orange">Poisson</span></td>
+          <td>cell × hour × DOW</td>
+          <td>Expected total stops in this bin</td>
+          <td class="center neutral">—</td>
+          <td><code>poisson_nll(log_input=True)</code></td>
+          <td class="center">0.25</td>
+        </tr>
+        <tr>
+          <td><code>speed_occurrence</code></td>
+          <td><span class="pill orange">Poisson</span></td>
+          <td>cell × hour × DOW</td>
+          <td>Speed stops detected by mobile enforcement</td>
+          <td class="center neutral">—</td>
+          <td><code>poisson_nll(log_input=True)</code></td>
+          <td class="center">0.10</td>
+        </tr>
+        <tr>
+          <td><code>trap</code></td>
+          <td><span class="pill orange">Poisson</span></td>
+          <td>cell × hour × DOW</td>
+          <td>Speed stops detected by stationary radar/laser</td>
+          <td class="center neutral">—</td>
+          <td><code>poisson_nll(log_input=True)</code></td>
+          <td class="center">0.05</td>
+        </tr>
+        <tr>
+          <td><code>speed</code></td>
+          <td><span class="pill purple">Binary</span></td>
+          <td>per stop</td>
+          <td>P(stop is speed-related)</td>
+          <td class="center"><strong>22%</strong></td>
+          <td><code>BCE(pos_weight=3.6)</code></td>
+          <td class="center">0.08</td>
+        </tr>
+        <tr>
+          <td><code>search</code></td>
+          <td><span class="pill purple">Binary</span></td>
+          <td>per stop</td>
+          <td>P(vehicle search conducted)</td>
+          <td class="center"><strong>6%</strong></td>
+          <td><code>BCE(pos_weight=15)</code></td>
+          <td class="center">0.13</td>
+        </tr>
+        <tr>
+          <td><code>accident</code></td>
+          <td><span class="pill purple">Binary</span></td>
+          <td>per stop</td>
+          <td>P(stop linked to accident)</td>
+          <td class="center"><strong>5%</strong></td>
+          <td><code>BCE(pos_weight=18)</code></td>
+          <td class="center">0.18</td>
+        </tr>
+        <tr>
+          <td><code>injury</code></td>
+          <td><span class="pill purple">Binary</span></td>
+          <td>per stop</td>
+          <td>P(personal injury)</td>
+          <td class="center"><strong>2%</strong></td>
+          <td><code>BCE(pos_weight=48 → cap 50)</code></td>
+          <td class="center">0.13</td>
+        </tr>
+        <tr>
+          <td><code>disposition</code> <span class="tag-new">NEW v3.3.0</span></td>
+          <td><span class="pill purple">Binary</span></td>
+          <td>per stop</td>
+          <td>P(citation vs warning)</td>
+          <td class="center"><strong>64%</strong></td>
+          <td><code>BCE(pos_weight=0.58)</code></td>
+          <td class="center">0.08</td>
+        </tr>
+      </table>
+
+      <div class="banner">
+        <strong>Loss weight design.</strong> The 8 weights sum to <strong>1.00</strong>. Empirical hand-tuning: harder
+        heads (occurrence, accident) get higher weights. <code>disposition</code> (NEW) was rebalanced from
+        <code>speed_occ</code> + <code>speed</code> to make room without hurting other heads.
+      </div>
+
+      <h3>Why partition speed_occurrence vs trap?</h3>
+      <p>
+        Both are filtered to <code>is_speed_related == 1</code> first, then partitioned by detection method:
+        <code>speed_occurrence</code> = mobile enforcement codes (A/B/C/D/I/J), <code>trap</code> = stationary
+        codes (radar/laser/VASCAR). Pre-partition the heads were 95% correlated (useless ensemble); post-partition
+        only 5.4% correlated &mdash; making them genuinely informative.
+      </p>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 07 LOSSES & WEIGHTS -->
+    <!-- ============================================================ -->
+    <section id="losses">
+      <h2><span class="anchor-num">07</span>Losses &amp; Composite Metric</h2>
+      <p class="lede">How we combine 8 head losses for training and how we measure success.</p>
+
+      <h3>Total training loss</h3>
+      <pre>loss_total = LOSS_WEIGHTS["occurrence"]       * loss_occurrence
+           + LOSS_WEIGHTS["speed_occurrence"] * loss_speed_occ
+           + LOSS_WEIGHTS["trap"]             * loss_trap
+           + LOSS_WEIGHTS["speed"]            * loss_speed
+           + LOSS_WEIGHTS["search"]           * loss_search
+           + LOSS_WEIGHTS["accident"]         * loss_accident
+           + LOSS_WEIGHTS["injury"]           * loss_injury
+           + LOSS_WEIGHTS["disposition"]      * loss_disposition</pre>
+
+      <h3>Composite evaluation metric</h3>
+      <p>The single number we use to compare model versions. Centered at 0 = matches XGBoost baseline.</p>
+      <pre>xgb_mae = {"occ_mae": 0.339, "speed_occ_mae": 0.086, "trap_mae": 0.091}
+xgb_auc = {"speed_auc": 0.842, "search_auc": 0.883,
+           "accident_auc": 0.894, "injury_auc": 0.881,
+           "disposition_auc": 0.65}  # baseline estimate
+
+mae_score = sum((xgb_mae[k] - metrics[k]) / xgb_mae[k] for k in xgb_mae)
+auc_score = sum((metrics[k] - xgb_auc[k]) for k in xgb_auc)
+composite = mae_score + auc_score</pre>
+
+      <ul style="list-style-type: disc; padding-left: 24px; color: var(--light); margin: 12px 0;">
+        <li>For MAE heads: relative improvement (positive = lower MAE than XGB = better)</li>
+        <li>For AUC heads: absolute improvement (positive = higher AUC than XGB = better)</li>
+        <li><strong>0</strong> = matches XGBoost baseline across the board</li>
+        <li><strong>+1.0</strong> ≈ "average of 8 heads each beat XGB by ~12.5%"</li>
+      </ul>
+
+      <h3>Per-fold composite for v3.3.0</h3>
+      <table>
+        <tr><th>Fold</th><th>Composite</th><th>Notes</th></tr>
+        <tr><td>0 (smallest, oldest)</td><td><span class="pos">+0.724</span></td><td>83% citation imbalance — naturally noisier</td></tr>
+        <tr><td>1</td><td><span class="pos">+0.845</span></td><td>83% citation imbalance</td></tr>
+        <tr><td>2</td><td>—</td><td>SKIPPED (degenerate test set, 1 row)</td></tr>
+        <tr><td>3</td><td><span class="pos">+0.975</span></td><td>69% citation</td></tr>
+        <tr><td>4 (largest, newest)</td><td><span class="pos">+0.988</span></td><td>64% citation, most data</td></tr>
+        <tr><td><strong>Mean</strong></td><td><strong class="pos">+0.883</strong></td><td>+14% over previous v3.2.0 mean of +0.775</td></tr>
+      </table>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 08 TRAINING -->
+    <!-- ============================================================ -->
+    <section id="training">
+      <h2><span class="anchor-num">08</span>Training Pipeline</h2>
+      <p class="lede">Walk-forward CV + Modal multi-container parallel training.</p>
+
+      <h3>Walk-forward 5-fold CV</h3>
+      <p>For temporal data, random k-fold leaks future into past. We use chronological splits where each fold's training data is strictly BEFORE its test period.</p>
+
+      <svg class="diagram" viewBox="0 0 900 240" xmlns="http://www.w3.org/2000/svg">
+        <!-- Timeline ruler -->
+        <line x1="40" y1="40" x2="860" y2="40" stroke="#7A889E" stroke-width="1"/>
+        <text class="label-tiny" x="40" y="30" text-anchor="middle">2012</text>
+        <text class="label-tiny" x="450" y="30" text-anchor="middle">2018</text>
+        <text class="label-tiny" x="860" y="30" text-anchor="middle">2026</text>
+
+        <!-- Folds: train (blue) → val (orange) → test (green) -->
+        <text class="label-sm" x="20" y="73" text-anchor="end">Fold 0</text>
+        <rect x="40" y="58" width="120" height="22" fill="#1B3A5E" stroke="#4A8BFF"/>
+        <rect x="160" y="58" width="20" height="22" fill="#FF9E4D" opacity="0.7"/>
+        <rect x="180" y="58" width="60" height="22" fill="#4CC27A" opacity="0.7"/>
+
+        <text class="label-sm" x="20" y="103" text-anchor="end">Fold 1</text>
+        <rect x="40" y="88" width="200" height="22" fill="#1B3A5E" stroke="#4A8BFF"/>
+        <rect x="240" y="88" width="20" height="22" fill="#FF9E4D" opacity="0.7"/>
+        <rect x="260" y="88" width="80" height="22" fill="#4CC27A" opacity="0.7"/>
+
+        <text class="label-sm" x="20" y="133" text-anchor="end" fill="#E35C5C">Fold 2 (skip)</text>
+        <rect x="40" y="118" width="300" height="22" fill="#1B3A5E" stroke="#4A8BFF" opacity="0.4"/>
+        <rect x="340" y="118" width="20" height="22" fill="#FF9E4D" opacity="0.4"/>
+        <rect x="360" y="118" width="2" height="22" fill="#4CC27A" opacity="0.7"/>
+        <text class="label-tiny" x="375" y="134" fill="#E35C5C">degenerate (1 row test)</text>
+
+        <text class="label-sm" x="20" y="163" text-anchor="end">Fold 3</text>
+        <rect x="40" y="148" width="400" height="22" fill="#1B3A5E" stroke="#4A8BFF"/>
+        <rect x="440" y="148" width="20" height="22" fill="#FF9E4D" opacity="0.7"/>
+        <rect x="460" y="148" width="120" height="22" fill="#4CC27A" opacity="0.7"/>
+
+        <text class="label-sm" x="20" y="193" text-anchor="end">Fold 4</text>
+        <rect x="40" y="178" width="540" height="22" fill="#1B3A5E" stroke="#4A8BFF"/>
+        <rect x="580" y="178" width="20" height="22" fill="#FF9E4D" opacity="0.7"/>
+        <rect x="600" y="178" width="160" height="22" fill="#4CC27A" opacity="0.7"/>
+
+        <!-- Legend -->
+        <rect x="40" y="220" width="14" height="14" fill="#1B3A5E" stroke="#4A8BFF"/>
+        <text class="label-sm" x="60" y="232">Train</text>
+        <rect x="120" y="220" width="14" height="14" fill="#FF9E4D" opacity="0.7"/>
+        <text class="label-sm" x="140" y="232">Val (embargo)</text>
+        <rect x="240" y="220" width="14" height="14" fill="#4CC27A" opacity="0.7"/>
+        <text class="label-sm" x="260" y="232">Test</text>
+      </svg>
+
+      <h3>Modal multi-container deployment</h3>
+      <p>The launcher fans out 4 parallel containers via <code>.starmap()</code>:</p>
+      <pre>@app.function(
+    gpu="L4",
+    max_containers=4,    # KEY: allows 4 parallel L4 containers
+    timeout=10800,
+    volumes={"/features": features_vol, "/checkpoints": checkpoints_vol},
+)
+def train_one_v330_fold_multi(fold_idx, epochs=60, ...):
+    train_fold(args, fold_idx)   # next_gen.train
+
+@app.local_entrypoint()
+def main(folds="0,1,3,4", epochs=60, ...):
+    args_iter = [(f, epochs, ...) for f in fold_list]
+    results = list(train_one_v330_fold_multi.starmap(args_iter))</pre>
+
+      <h3>Why multi-container vs other strategies</h3>
+      <table>
+        <tr><th>Strategy</th><th>Wall time</th><th>Cost</th><th>Trade-off</th></tr>
+        <tr>
+          <td>Sequential (1 GPU)</td>
+          <td>8.4 hr</td>
+          <td>$4.25</td>
+          <td>Simple, slowest</td>
+        </tr>
+        <tr>
+          <td>Packed (4 jobs share 1 GPU)</td>
+          <td>5 hr</td>
+          <td>$4.00</td>
+          <td>Cheapest; CUDA serializes kernels</td>
+        </tr>
+        <tr style="background: rgba(76,194,122,0.12);">
+          <td><strong>Multi-container (4 GPUs)</strong></td>
+          <td><strong class="pos">2.1 hr</strong></td>
+          <td><strong>$4.25</strong></td>
+          <td><strong>Chosen</strong> — same cost as sequential, 4× faster wall</td>
+        </tr>
+      </table>
+      <p class="footnote">Per-fold solo VRAM: 1.84 GB. L4 has 24 GB. Comfortable headroom.</p>
+
+      <h3>Per-fold checkpoint outputs</h3>
+      <p>For each fold, training saves:</p>
+      <ul style="list-style-type: disc; padding-left: 24px; color: var(--light); margin: 12px 0;">
+        <li><code>unified_phase2_fold{N}.pt</code> — last-epoch composite ckpt</li>
+        <li><code>unified_phase2_fold{N}_best_speed_auc.pt</code> — best speed_auc across all epochs</li>
+        <li>...same for <code>search_auc</code>, <code>accident_auc</code>, <code>injury_auc</code>, <code>disposition_auc</code>, <code>occ_mae</code>, <code>speed_occ_mae</code>, <code>trap_mae</code></li>
+      </ul>
+      <p>So 9 checkpoint files per fold × 4 folds = 36 files (~150 MB total). Ensemble inference uses the per-head specialists for each head when available.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 09 ENSEMBLE INFERENCE -->
+    <!-- ============================================================ -->
+    <section id="ensemble">
+      <h2><span class="anchor-num">09</span>Ensemble Inference</h2>
+      <p class="lede">After training, average per-fold predictions on the laptop A4000.</p>
+
+      <h3>Binary head ensemble (per stop)</h3>
+      <pre>for fold in [0, 1, 3, 4]:
+    enable_te, leak_safe, expected_n = _decide_te_for_fold(fold)
+    stop_ds = build_fold_dataset(stops, bins, fold,
+                                  enable_te=enable_te, leak_safe=leak_safe)
+    for head in BINARY_HEADS:
+        ckpt = load_specialist_ckpt(fold, head)
+        probs[head] += sigmoid(ckpt.forward(stop_ds))
+probs[head] /= len(folds)   # ensemble average</pre>
+
+      <h3>Multi-version checkpoint loader</h3>
+      <p>The <code>_decide_te_for_fold</code> function peeks at the checkpoint's <code>stop_encoder.0.weight</code> shape to auto-detect what version of the model it is:</p>
+      <table>
+        <tr><th>Expected n_stop_numeric</th><th>Version</th><th>What it implies</th></tr>
+        <tr><td>~112</td><td>v3.0.0 / v3.1.0</td><td>No runtime TE (precomputed only)</td></tr>
+        <tr><td>142</td><td>v3.1.1 / v3.2.0</td><td>With TE (28 cols), no leak-safe</td></tr>
+        <tr><td><strong>136</strong></td><td><strong>v3.3.0</strong></td><td>With TE (24 cols, smaller), <strong>leak-safe</strong> (drops era flags)</td></tr>
+      </table>
+      <p class="footnote">No CLI flag needed — the loader auto-detects which dataset preprocessing matches the checkpoint, building the dataset with the correct TE config and leak_safe state.</p>
+
+      <h3>Output parquets</h3>
+      <table>
+        <tr><th>File</th><th>Rows</th><th>Cols</th><th>Purpose</th></tr>
+        <tr><td><code>stop_predictions_v4_ensemble.parquet</code></td><td>1,237,250</td><td>13</td><td>Per-stop probs incl. <code>disposition_citation_prob</code></td></tr>
+        <tr><td><code>bin_predictions_v4_ensemble.parquet</code></td><td>1,140,888</td><td>~10</td><td>Per-cell-bin Poisson counts for heatmap</td></tr>
+      </table>
+
+      <h3>Production deploy</h3>
+      <p>The bin predictions get filtered + uploaded to the production <code>police_predictions</code> table:</p>
+      <pre>MODEL_VERSION_BASE=v4.3.0-ensemble \
+    python3 scripts/upload_bin_predictions_v4_ensemble.py</pre>
+      <p>Inserts ~333,885 rows tagged across 3 model_versions (one per Poisson head):</p>
+      <ul style="list-style-type: disc; padding-left: 24px; color: var(--light); margin: 12px 0;">
+        <li><code>v4.3.0-ensemble</code> — 212,398 rows (occurrence)</li>
+        <li><code>v4.3.0-ensemble-speed</code> — 75,143 rows (mobile)</li>
+        <li><code>v4.3.0-ensemble-trap</code> — 46,344 rows (stationary)</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 10 LEAK -->
+    <!-- ============================================================ -->
+    <section id="leak">
+      <h2><span class="anchor-num">10</span>The Leak War Story</h2>
+      <p class="lede">When AUC = 1.000, you have a leak — twice over.</p>
+
+      <div class="banner red">
+        <strong>Symptom:</strong> Smoke test of v3.3.0 disposition head showed
+        <code style="color: var(--red);">disposition_auc = 1.000</code> across all 5 epochs. Too perfect.
+      </div>
+
+      <h3>Diagnosis #1 — Per-cell <code>citation_rate</code> aggregation leak</h3>
+      <div class="card red">
+        <p><strong>What was wrong:</strong> <code>pipelines/09j_precompute_cell_lens_stats.py</code> computed per-cell <code>citation_rate = n_citations / (n_citations + n_warnings)</code> over <strong>all stops</strong>, no fold split. For each stop, the cell rate INCLUDED that stop's own outcome.</p>
+        <p><strong>The fix:</strong> Made <code>09j</code> accept <code>--fold-idx N</code> flag. When set, filters input to that fold's <code>train+val</code> stops before groupby. Produces <code>cell_lens_stats_fold{N}.parquet</code> for each fold. At training time, <code>load_fold_split</code> swaps the canonical <code>citation_rate</code> column with the right fold-N variant.</p>
+        <p><strong>Re-smoke result:</strong> Still 1.000. There was a SECOND leak.</p>
+      </div>
+
+      <h3>Diagnosis #2 — <code>violation_type</code> target encoding leak</h3>
+      <div class="card red">
+        <p><strong>What was wrong:</strong> <code>TE_CATEGORICALS</code> in <code>deep/data.py</code> contained <code>violation_type</code> (4 values: Citation, Warning, ESERO, SERO). For each (cat, target) pair, runtime TE produced one column. So <code>violation_type_te_is_speed_related</code>, <code>violation_type_te_search_conducted</code>, <code>violation_type_te_accident</code>, <code>violation_type_te_personal_injury</code> — 4 columns from violation_type alone.</p>
+        <p>Each violation_type value gets a UNIQUE 4-tuple of TE values across those 4 columns. The disposition head sees those 4 columns and can perfectly recover violation_type → recover <code>is_citation = (violation_type == "Citation")</code>.</p>
+        <p><strong>The fix:</strong> Replaced <code>violation_type</code> + <code>violation_type_top</code> with <code>arrest_type_letter</code> in <code>TE_CATEGORICALS</code>. arrest_type_letter has 19 distinct codes with citation rates spanning 0.32-0.92 — no perfect lookup possible.</p>
+      </div>
+
+      <div class="banner green">
+        <strong>Result:</strong> <code style="color: var(--green);">disposition_auc = 0.674</code> (honest).
+        Composite +0.479 at fold 4 — realistic, not inflated.
+      </div>
+
+      <h3>Trade-off cost of the leak fix</h3>
+      <p>Removing <code>violation_type_te_*</code> hurt other heads that DID get a real (non-leaky) signal from those columns:</p>
+      <table>
+        <tr><th>Head</th><th>v3.2.0 AUC (with leak)</th><th>v3.3.0 AUC (fixed)</th><th>Δ</th></tr>
+        <tr><td>accident</td><td>0.894</td><td>0.863</td><td><span class="neg">-0.031</span></td></tr>
+        <tr><td>injury</td><td>0.881</td><td>0.821</td><td><span class="neg">-0.060</span></td></tr>
+        <tr><td>disposition (NEW)</td><td>1.000 (leaked)</td><td>0.674 (honest)</td><td>—</td></tr>
+      </table>
+      <p>We accepted -0.05 to -0.10 AUC drop on 2 heads to ship an honest disposition head + close two leak vectors.</p>
+
+      <div class="banner highlight">
+        <strong>Lesson:</strong> Target encoding can leak indirectly via shared categorical bases. When you add a new prediction head, audit ALL existing target-derived features against the new target — not just the obvious ones. AUC = 1.000 is your alarm system, not a celebration.
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 11 HYPERPARAMETERS -->
+    <!-- ============================================================ -->
+    <section id="hyperparams">
+      <h2><span class="anchor-num">11</span>Hyperparameters</h2>
+      <p class="lede">Configuration in production.</p>
+
+      <h3>Model architecture</h3>
+      <table>
+        <tr><th>Hyperparameter</th><th>Value</th><th>Why</th></tr>
+        <tr><td><code>d_token</code></td><td>128</td><td>Per-feature embedding dim. Gorishniy 2022 default. Matches embedding dim for categoricals.</td></tr>
+        <tr><td><code>n_layers</code></td><td>4</td><td>Transformer block depth. Empirical sweet spot — deeper increases overfit risk.</td></tr>
+        <tr><td><code>n_heads</code></td><td>8</td><td>Multi-head attention. Each head has dim 16 (= 128/8).</td></tr>
+        <tr><td><code>n_periodic_freqs</code></td><td>8</td><td>PLR tokenizer learned frequencies per numeric.</td></tr>
+        <tr><td><code>attn_dropout</code></td><td>0.2</td><td>Regularization on attention weights.</td></tr>
+        <tr><td><code>residual_dropout</code></td><td>0.1</td><td>Dropout on transformer block outputs.</td></tr>
+        <tr><td><code>FFN activation</code></td><td>ReGLU</td><td>Gated linear unit variant — Gorishniy 2022 finding.</td></tr>
+        <tr><td><code>norm</code></td><td>pre-norm (LayerNorm before attention)</td><td>More stable than post-norm at our scale.</td></tr>
+      </table>
+
+      <h3>Training</h3>
+      <table>
+        <tr><th>Hyperparameter</th><th>Value</th></tr>
+        <tr><td><code>epochs</code></td><td>60</td></tr>
+        <tr><td><code>patience</code></td><td>30 (early stop after 30 ep no improvement)</td></tr>
+        <tr><td><code>batch_size</code></td><td>1024</td></tr>
+        <tr><td><code>lr</code></td><td>3e-4 (AdamW)</td></tr>
+        <tr><td><code>warmup_frac</code></td><td>0.1 (10% of total epochs)</td></tr>
+        <tr><td><code>scheduler</code></td><td>CosineAnnealingLR (after warmup)</td></tr>
+        <tr><td><code>differential LR ratio</code></td><td>backbone × 0.5, heads × 1.0</td></tr>
+        <tr><td><code>weight_decay</code></td><td>1e-4</td></tr>
+        <tr><td><code>grad_clip</code></td><td>1.0 (max_norm)</td></tr>
+        <tr><td><code>pos_weight_cap</code></td><td>50.0 (caps imbalance multiplier)</td></tr>
+        <tr><td><code>amp (mixed precision)</code></td><td>enabled (CUDA only)</td></tr>
+      </table>
+
+      <h3>Data</h3>
+      <table>
+        <tr><th>Setting</th><th>Value</th></tr>
+        <tr><td><code>seed</code></td><td>42</td></tr>
+        <tr><td><code>leak_safe</code></td><td>True (drops <code>is_post_covid</code>, <code>is_covid_era</code>)</td></tr>
+        <tr><td><code>TE smoothing</code></td><td>20.0 (Bayesian shrinkage toward global mean)</td></tr>
+        <tr><td><code>TE on train+val only</code></td><td>True (FoldSafeTargetEncoder)</td></tr>
+        <tr><td><code>std floor (numerics)</code></td><td>1.0 if train_std &lt; 1e-3 (era-flag guard)</td></tr>
+        <tr><td><code>z-score clip</code></td><td>±10 (safety net for distance features with sentinel values)</td></tr>
+        <tr><td><code>citation_rate fold-aware</code></td><td>True (v3.3.0)</td></tr>
+      </table>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 12 STACK -->
+    <!-- ============================================================ -->
+    <section id="stack">
+      <h2><span class="anchor-num">12</span>Tech Stack</h2>
+      <p class="lede">What runs where, and why we chose each piece.</p>
+
+      <table>
+        <tr><th>Layer</th><th>Tech</th><th>Where</th><th>Why</th></tr>
+        <tr><td>ML model</td><td>PyTorch 2.5, custom FT-T impl</td><td>Modal L4 (training), laptop A4000 (inference)</td><td>PyTorch is Python ML standard; FT-T from Gorishniy 2021 paper</td></tr>
+        <tr><td>GPU compute</td><td>NVIDIA L4 (training), A4000 (inference)</td><td>Modal cloud + laptop</td><td>L4 cost-optimal; A4000 free for inference</td></tr>
+        <tr><td>Compute orchestration</td><td>Modal (serverless GPU)</td><td>Cloud</td><td>Pay-per-second, no infra to manage</td></tr>
+        <tr><td>ML data format</td><td>Parquet (zstd compressed)</td><td>Disk + Modal volumes</td><td>Columnar, fast pandas read, ~10× smaller than CSV</td></tr>
+        <tr><td>Feature engineering</td><td>pandas, numpy, h3-py</td><td>Server (16-core AVX-512)</td><td>Standard data science stack</td></tr>
+        <tr><td>Spatial indexing</td><td>PostGIS, Uber H3 grid</td><td>Postgres + Python</td><td>H3 = uniform-area cells, O(1) lookup</td></tr>
+        <tr><td>Frontend</td><td>Next.js 16 (App Router), React 19</td><td>Server (standalone build)</td><td>SSR + API routes in one app</td></tr>
+        <tr><td>Map rendering</td><td>Mapbox GL JS</td><td>Browser</td><td>Vector tiles, fast, customizable</td></tr>
+        <tr><td>DB (predictions + stops)</td><td>Postgres 17 + PostGIS</td><td>Server (Docker)</td><td>SQL + geo queries; 1.27M+ rows handled comfortably</td></tr>
+        <tr><td>Auth</td><td>NextAuth v5 (5.0.0-beta.30)</td><td>Server</td><td>Session/JWT, password hash via bcrypt</td></tr>
+        <tr><td>Deploy</td><td>git push → GitHub Actions → pm2</td><td>Cloud → server</td><td>Atomic rollouts, easy rollback via revert</td></tr>
+        <tr><td>Reverse proxy</td><td>Caddy</td><td>Server</td><td>Auto-HTTPS, simple config</td></tr>
+      </table>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 13 FUTURE -->
+    <!-- ============================================================ -->
+    <section id="future">
+      <h2><span class="anchor-num">13</span>Future Work</h2>
+      <p class="lede">What's NOT built and what's worth building next.</p>
+
+      <h3>ML model improvements</h3>
+      <div class="grid-2">
+        <div class="card highlight">
+          <h4 style="color: var(--highlight);">Conformal prediction wrapper</h4>
+          <p>Calibrated uncertainty intervals on every prediction. Currently model gives point predictions but no honest uncertainty. Vovk 2005 framework — model-agnostic post-hoc.</p>
+        </div>
+        <div class="card highlight">
+          <h4 style="color: var(--highlight);">Multi-seed ensembling</h4>
+          <p>3-5 seeds × 4 folds = 12-20 ensemble members. Each seed's random init produces different errors → averaging cancels noise. Expected lift: ~+0.01-0.02 composite per added seed.</p>
+        </div>
+        <div class="card highlight">
+          <h4 style="color: var(--highlight);">Fairness audit</h4>
+          <p>Disparate-impact analysis on demographic features (race entropy, reg state diversity). Currently uses cell-level demographic aggregates without auditing for systematic bias.</p>
+        </div>
+        <div class="card highlight">
+          <h4 style="color: var(--highlight);">v3.4.0: 3-way disposition</h4>
+          <p>Citation / Warning / SERO — finer-grained outcome prediction than current 2-way binary.</p>
+        </div>
+      </div>
+
+      <h3>Known limitations / honest discussion</h3>
+      <ul style="list-style-type: disc; padding-left: 24px; color: var(--light); margin: 12px 0;">
+        <li>
+          <strong>Disposition fold-0 weakness:</strong> 83% class imbalance on early data amplifies noise.
+          Best AUC=0.890 there (suspicious — possible artifact).
+        </li>
+        <li>
+          <strong>strictness_speed_over leakage (partial):</strong> filtered by <code>is_speed_related</code>
+          (different head's target). Leaky for the speed head only — flagged for v3.4.0.
+        </li>
+        <li>
+          <strong>No external alerting / health monitoring:</strong> Sentry catches errors, but no
+          uptime monitoring on inference latency or model drift.
+        </li>
+        <li>
+          <strong>Walk-forward CV is strict but not perfect:</strong> per-cell rolling features
+          (<code>stops_last_7d</code>) are computed once at the data-prep stage, not per-fold.
+          Could leak slightly in early folds. Negligible empirically.
+        </li>
+        <li>
+          <strong>4-fold ensemble vs full 5-fold:</strong> fold 2 skipped due to data anomaly,
+          not architectural choice. Fixing the underlying split would let us include it.
+        </li>
+        <li>
+          <strong>Hyperparameter ablation incomplete:</strong> d_token, n_layers, dropout chosen
+          from defaults + slim ablation. Not exhaustive grid search.
+        </li>
+      </ul>
+
+      <h3>Phase 3 patterns that didn't work</h3>
+      <p>Documented in <code>docs/next-gen/planning/16_lstm_gnn_integration.md</code>. All failed their smoke gates:</p>
+      <table>
+        <tr><th>Pattern</th><th>Smoke result</th><th>Verdict</th></tr>
+        <tr><td>Spatial GAT (fold 0, 30ep)</td><td>+0.136 cmp (Δ -0.156 vs baseline +0.292)</td><td><span class="tag-fail">FAILED</span></td></tr>
+        <tr><td>Mixture-of-Experts (fold 4, 30ep)</td><td>+0.917 cmp (Δ -0.226 vs baseline +1.143)</td><td><span class="tag-fail">FAILED</span></td></tr>
+        <tr><td>Hawkes intensity (fold 0, 60ep)</td><td>+0.262 cmp (Δ -0.030)</td><td><span class="tag-fail">FAILED</span></td></tr>
+        <tr><td>LSTM temporal_fuse (v2)</td><td>Δ -0.067 cmp</td><td><span class="tag-fail">FAILED</span></td></tr>
+      </table>
+      <p class="footnote">Working hypothesis: PLR (Phase 3A) captured most of the architectural lift these patterns aimed to add. Adding more learnable components within a 30-60 ep smoke window competes with PLR baseline that's already near-converged. Branches preserved for future revisit.</p>
+    </section>
+
+    <footer>
+      Evasion v3.3.0 architecture reference &middot; Built 2026-04-27 &middot;
+      Source: <code>docs/v330-architecture-detail.html</code><br>
+      Companion docs: <code>docs/presentation/structure.md</code> &middot;
+      <code>docs/presentation/background.md</code> &middot;
+      <code>docs/presentation/architecture.md</code>
+    </footer>
+
+  </main>
+
+</div>
+</body>
+</html>
